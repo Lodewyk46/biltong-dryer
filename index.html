@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Biltong Dryer Remote</title>
+<style>
+body{font-family:Arial,sans-serif;background:#f2f2f2;margin:0;padding:18px;color:#222} .card{max-width:620px;margin:auto;background:#fff;border-radius:16px;padding:20px;box-shadow:0 3px 15px #0002}h1{text-align:center;margin:4px 0 18px}.status{text-align:center;font-weight:bold;padding:12px;border-radius:10px;background:#eee;margin-bottom:14px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.box{background:#f7f7f7;padding:12px;border-radius:10px}.label{font-size:13px;color:#666}.value{font-size:25px;font-weight:bold}.buttons{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}button{border:0;border-radius:10px;padding:14px;font-size:17px;font-weight:bold;cursor:pointer} .start{background:#35a853;color:#fff}.stop{background:#d93025;color:#fff}.continue{background:#4285f4;color:#fff}.restart{background:#777;color:#fff}.small{font-size:14px;padding:10px}.setup{margin-top:18px}.row{display:flex;align-items:center;justify-content:space-between;margin:8px 0}.row button{width:48px;padding:9px}.login input{width:100%;box-sizing:border-box;padding:11px;margin:5px 0;border:1px solid #ccc;border-radius:8px;font-size:16px}.connect{background:#222;color:#fff;width:100%;margin-top:8px}.log{margin-top:16px;background:#111;color:#0f0;padding:10px;border-radius:10px;height:130px;overflow:auto;font:12px monospace;white-space:pre-wrap}.hidden{display:none}.raw{font:11px monospace;word-break:break-all;margin-top:8px;color:#555}
+</style>
+</head>
+<body>
+<div class="card">
+<h1>BILTONG DRYER</h1>
+<div id="status" class="status">NOT CONNECTED</div>
+
+<div id="login" class="login">
+<input id="user" placeholder="HiveMQ username" autocomplete="username">
+<input id="pass" type="password" placeholder="HiveMQ password" autocomplete="current-password">
+<button class="connect" onclick="connectMQTT()">CONNECT</button>
+</div>
+
+<div id="dashboard" class="hidden">
+<div class="grid">
+<div class="box"><div class="label">Temperature</div><div class="value"><span id="temp">--</span> °C</div></div>
+<div class="box"><div class="label">Humidity</div><div class="value"><span id="hum">--</span> %</div></div>
+<div class="box"><div class="label">Elapsed Time</div><div class="value" id="elapsed">00:00:00</div></div>
+<div class="box"><div class="label">Process</div><div class="value" id="process">--</div></div>
+</div>
+<div class="grid" style="margin-top:10px">
+<div class="box">Heater: <b id="heater">--</b></div>
+<div class="box">Circulation: <b id="circ">--</b></div>
+<div class="box">Ventilation: <b id="vent">--</b></div>
+<div class="box">Safety: <b id="safety">--</b></div>
+</div>
+<div id="controls" class="buttons"></div>
+<div class="setup box">
+<b>DRYER SETUP</b>
+<div class="row">Temperature Min <span><button class="small" onclick="cmd('TEMP_MIN',-1)">−</button> <b id="tmin">--</b> °C <button class="small" onclick="cmd('TEMP_MIN',1)">+</button></span></div>
+<div class="row">Temperature Max <span><button class="small" onclick="cmd('TEMP_MAX',-1)">−</button> <b id="tmax">--</b> °C <button class="small" onclick="cmd('TEMP_MAX',1)">+</button></span></div>
+<div class="row">Humidity Min <span><button class="small" onclick="cmd('HUM_MIN',-1)">−</button> <b id="hmin">--</b> % <button class="small" onclick="cmd('HUM_MIN',1)">+</button></span></div>
+<div class="row">Humidity Max <span><button class="small" onclick="cmd('HUM_MAX',-1)">−</button> <b id="hmax">--</b> % <button class="small" onclick="cmd('HUM_MAX',1)">+</button></span></div>
+</div>
+<button class="connect" style="margin-top:12px" onclick="disconnectMQTT()">DISCONNECT</button>
+</div>
+
+</div>
+
+<script src="https://unpkg.com/mqtt@5.15.2/dist/mqtt.min.js"></script>
+<script>
+const BROKER='wss://edbba5295fc1498aaf7cd6834103debd.s1.eu.hivemq.cloud:8884/mqtt';
+const STATUS='biltongdryer/status';
+const COMMAND='biltongdryer/command';
+let client=null;
+const $=id=>document.getElementById(id);
+function log(s){}
+function setStatus(s){$('status').textContent=s}
+log('PAGE LOADED');
+if(typeof mqtt==='undefined'){log('ERROR: MQTT.js did not load');setStatus('MQTT LIBRARY NOT LOADED')}else log('MQTT.JS LOADED');
+function connectMQTT(){
+ if(typeof mqtt==='undefined'){alert('MQTT.js did not load. Please reload the page.');return}
+ const u=$('user').value.trim(),p=$('pass').value;
+ if(!u||!p){alert('Enter your HiveMQ username and password.');return}
+ if(client) try{client.end(true)}catch(e){}
+ const id='biltong-web-'+Date.now()+'-'+Math.floor(Math.random()*100000);
+ log('CONNECTING: '+BROKER);
+ setStatus('CONNECTING...');
+ client=mqtt.connect(BROKER,{username:u,password:p,clientId:id,protocolVersion:4,clean:true,reconnectPeriod:3000,connectTimeout:15000,keepalive:30,resubscribe:false});
+ client.on('connect',()=>{
+   log('MQTT CONNECTED');setStatus('REMOTE CONNECTED');$('login').classList.add('hidden');$('dashboard').classList.remove('hidden');
+   client.subscribe(STATUS,{qos:0},err=>{if(err)log('SUBSCRIBE ERROR: '+err.message);else log('SUBSCRIBED: '+STATUS)});
+ });
+ client.on('message',(topic,payload)=>{const s=payload.toString();log('MESSAGE: '+topic);try{update(JSON.parse(s))}catch(e){}});
+ client.on('error',e=>{log('MQTT ERROR: '+(e&&e.message?e.message:e));setStatus('CONNECTION ERROR')});
+ client.on('close',()=>{log('WEBSOCKET/MQTT CLOSED');setStatus('DISCONNECTED')});
+ client.on('reconnect',()=>{log('RECONNECTING...');setStatus('RECONNECTING...')});
+ client.on('offline',()=>log('OFFLINE'));
+}
+function disconnectMQTT(){if(client){log('DISCONNECTING');client.end(true);client=null}setStatus('NOT CONNECTED');$('dashboard').classList.add('hidden');$('login').classList.remove('hidden')}
+function update(d){
+ $('temp').textContent=Number(d.temperature).toFixed(1);$('hum').textContent=Number(d.humidity).toFixed(1);$('process').textContent=d.process||'--';$('safety').textContent=d.safety||'--';
+ $('heater').textContent=d.heater?'ON':'OFF';$('circ').textContent=d.circulation?'ON':'OFF';$('vent').textContent=d.ventilation?'ON':'OFF';
+ $('tmin').textContent=d.temperatureMin;$('tmax').textContent=d.temperatureMax;$('hmin').textContent=d.humidityMin;$('hmax').textContent=d.humidityMax;
+ let sec=Number(d.elapsed||0);let h=Math.floor(sec/3600),m=Math.floor(sec%3600/60),s=sec%60;$('elapsed').textContent=String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+ renderControls(d.process);
+}
+function renderControls(state){const c=$('controls');c.innerHTML='';if(state==='READY') add('START','start','START');else if(state==='RUNNING') add('STOP','stop','STOP');else if(state==='STOPPED'){add('CONTINUE','continue','CONTINUE');add('RESTART','restart','RESTART')}}
+function add(label,cls,command){const b=document.createElement('button');b.textContent=label;b.className=cls;b.onclick=()=>cmd(command);$('controls').appendChild(b)}
+function cmd(name,value){if(!client||!client.connected){alert('Not connected to HiveMQ');return}let payload=name;if(value!==undefined){let el={TEMP_MIN:'tmin',TEMP_MAX:'tmax',HUM_MIN:'hmin',HUM_MAX:'hmax'}[name];let n=parseInt($(el).textContent)+value;let min=(name==='TEMP_MIN'||name==='TEMP_MAX')?15:20;let max=(name==='TEMP_MIN'||name==='TEMP_MAX')?35:100;n=Math.max(min,Math.min(max,n));payload=name+'='+n}log('COMMAND: '+payload);client.publish(COMMAND,payload,{qos:0})}
+</script>
+</body>
+</html>
