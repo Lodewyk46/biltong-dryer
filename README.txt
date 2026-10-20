@@ -1,12 +1,10 @@
-BILTONG DRYER — ICON FIX
+BILTONG DRYER — BACKGROUND AND ICON FIX
 
-This package keeps the uploaded index(4).html design and MQTT code intact, but replaces the old embedded logo with the exact image you supplied.
-
-Upload these three files to the ROOT of your existing GitHub Pages repository, replacing index.html and adding both PNG files:
+Upload these three files to the root of your existing GitHub Pages repository, replacing the old files:
 - index.html
-- apple-touch-icon-v3.png
-- favicon-v3.png
+- apple-touch-icon-v4.png
+- favicon-v4.png
 
-The new filenames avoid reusing the old cached icon URL. After GitHub Pages updates, on your iPhone remove the existing Home Screen shortcut, open the published HTTPS site in Safari, then Share > Add to Home Screen again. iOS may retain an old icon until the shortcut is removed and re-added.
+The MQTT broker, topics, controls, and existing page logic are retained. The phone background now uses the full image width without zooming/cropping it across the whole screen. The icon files have had the white outer corner halo reduced.
 
-The original background, layout, MQTT broker settings, command topics, and page logic are retained.
+After GitHub Pages updates, remove the old Home Screen shortcut from the iPhone. Open the published site in Safari, then Share > Add to Home Screen again. If the icon is still cached, close Safari and reopen the page before adding it again.
